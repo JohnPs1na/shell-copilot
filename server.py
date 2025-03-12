@@ -8,7 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from models.schemas import *
-
+from shared import MessageRequest, ASSISTANT_QUEUE
+from temporal_client import get_temporal_client
+from workflows import AssistantWorkflow
 app = FastAPI(debug=True)
 
 app.add_middleware(
@@ -28,9 +30,24 @@ async def sayhello(request:HelloRequest) -> Response:
     return Response(status_code=HTTPStatus.OK, content=json.dumps({"message":"HELLO WORLD"}))
 
 
-@app.post("/suggest")
-async def suggest(request:SuggestRequest) -> Response:
-    return Response(status_code=HTTPStatus.OK, content=json.dumps({"message": "example suggestion"}))
+@app.post("/start_workflow")
+async def start_workflow(body: MessageRequest):
+    client = await get_temporal_client()
+    result = await client.execute_workflow(
+        AssistantWorkflow.run,
+        body,
+        id=body.workflow_id,
+        task_queue=ASSISTANT_QUEUE
+    )
+    return result 
+
+
+@app.post("/send_signal/{workflow_id}")
+async def send_signal(workflow_id:str, body: dict=Body(...)):
+    client = await get_temporal_client()
+    handle = client.get_workflow_handle(workflow_id)
+    await handle.signal("submit_user_input",body["user_input"])
+    return {"message": "signal sent successfully"}
 
 
 if __name__ == "__main__":
