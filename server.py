@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from models.schemas import *
-from shared import MessageRequest, ASSISTANT_QUEUE
-from temporal_client import get_temporal_client
-from workflows import AssistantWorkflow
+from temporal_stuff.shared import MessageRequest, ASSISTANT_QUEUE
+from temporal_stuff.temporal_client import get_temporal_client
+from temporal_stuff.workflows import AssistantWorkflow
 app = FastAPI(debug=True)
 
 app.add_middleware(

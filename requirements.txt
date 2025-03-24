@@ -4,3 +4,4 @@ prompt_toolkit
 temporalio==1.6.0
 pika 
 python-dateutil
+google-genai
