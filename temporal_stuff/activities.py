@@ -3,13 +3,8 @@ import pika
 from temporalio import activity 
 from temporal_stuff.shared import Message, MessageContext, RabbitMqQueueParams, SuggestionInfo, ExplanationInfo
 from dataclasses import dataclass
-from classifier.model import *
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import re
-from collections import Counter
+from transformers import BertTokenizer, BertForSequenceClassification
 from temporal_stuff.Chatbot import Chatbot
 
 @dataclass 
@@ -25,21 +20,18 @@ class Activities:
     def __init__(self, intent_classifier = None) -> None:
         self.client_llm = Chatbot()
 
-        with open("../classifier/vocab.pkl","rb") as f:
-            self.vocab = pickle.load(f)
-
-        self.label2idx = {"Explain": 0, "Suggest": 1, "Out Of Scope": 2}
-        self.intent_classifier = TextClassifier(
-            vocab_size=len(self.vocab),
-            embedding_dim=embedding_dim,
-            hidden_dim=hidden_dim,
-            output_dim=3,
-            n_layers=n_layers,
-            bidirectional=bidirectional,
-            dropout=dropout
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.intent_classifier = BertForSequenceClassification.from_pretrained(
+            'bert-base-uncased',
+            num_labels=3
         )
         self.intent_classifier.load_state_dict(torch.load("../classifier/text_classifier.pt"))
         self.intent_classifier.eval()
+        
+        self.label2idx = {"Explain": 0, "Suggest": 1, "Out Of Scope": 2}
+        self.idx2label = {0: "Explain", 1: "Suggest", 2: "Out Of Scope"}
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.intent_classifier.to(self.device)
 
     async def get_llm_response(self, message, base_prompt, model_version=""):
         
@@ -48,17 +40,28 @@ class Activities:
 
     @activity.defn
     async def detect_intent(self,msgOBJ):
-        test_indices = encode_sentence(msgOBJ["message"], self.vocab)
-        test_tensor = torch.tensor(test_indices, dtype=torch.long)
-        self.intent_classifier.eval()
+
+        encoding = self.tokenizer.encode_plus(
+            msgOBJ["message"],
+            add_special_tokens=True,
+            max_length=128,
+            return_token_type_ids=False,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt'
+        )
+        
+        input_ids = encoding['input_ids'].to(self.device)
+        attention_mask = encoding['attention_mask'].to(self.device)
+
         with torch.no_grad():
-            output = self.intent_classifier(test_tensor)
-            predicted_label = torch.argmax(output, dim=1).item()
-            idx2label = {v: k for k, v in self.label2idx.items()}
-            print("Predicted label:", idx2label[predicted_label])
+            outputs = self.intent_classifier(input_ids=input_ids, attention_mask=attention_mask)
+            predicted_label = torch.argmax(outputs.logits, dim=1).item()
+            print("Predicted label:", self.idx2label[predicted_label])
 
         response_obj = {
-            "intent":idx2label[predicted_label]
+            "intent":self.idx2label[predicted_label]
         }
 
         return response_obj

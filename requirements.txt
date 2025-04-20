@@ -5,3 +5,10 @@ temporalio==1.6.0
 pika 
 python-dateutil
 google-genai
+transformers
+sentence-transformers
+datasets
+torch
+pandas
+scikit-learn
+numpy
