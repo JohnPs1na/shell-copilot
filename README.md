@@ -19,4 +19,3 @@ export GOOGLE_API_KEY="your_google_api_key" # used for gemini api
 
 ### run project
 - run `source run_project.sh`
-- 
