@@ -3,6 +3,7 @@ import os
 import re
 import uuid
 import requests
+import fcntl
 
 FILE_PATH = "/tmp/suggestions.txt"
 
@@ -13,15 +14,24 @@ def ensure_file_exists(file_path):
             pass
 
 def tail_f(file_path):
-
     with open(file_path, "r") as f:
-        f.seek(0, os.SEEK_END)
+        fd = f.fileno()
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        
         while True:
-            line = f.readline()
-            if not line:
+            try:
+                content = f.read()
+                if content:
+                    f.seek(0)
+                    yield content
+                    with open(file_path, "w") as clear_f:
+                        clear_f.truncate(0)
+                else:
+                    time.sleep(0.1)
+            except IOError:
                 time.sleep(0.1)
                 continue
-            yield line
 
 def display_suggestion(terminal_id, suggestion):
 
@@ -54,7 +64,7 @@ def process_line(line):
         display_suggestion(terminal_id, suggestion)
         
         with open(FILE_PATH, "w") as f:
-            f.write("")
+            f.truncate(0)
             f.flush()
             os.fsync(f.fileno())
             

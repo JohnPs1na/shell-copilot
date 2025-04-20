@@ -3,7 +3,7 @@ import os
 import sys
 import httpx
 import asyncio
-
+import fcntl
 
 SUGGESTION_FILE_PATH = "/tmp/suggestions.txt"
 
@@ -14,6 +14,19 @@ def ensure_file_exists(file_path):
     if not os.path.exists(file_path):
         with open(file_path, "a"):
             pass
+
+def write_with_lock(file_path, content):
+    """
+    Write to file with proper locking
+    """
+    with open(file_path, "w") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def main():
@@ -29,25 +42,17 @@ def main():
 
 
     command = sys.argv[1]
-
     keywords = ["suggest", "say"]
-    #Classifier intent maybe
 
     if command in keywords and len(sys.argv) > 2:
         message = " ".join(sys.argv[2:])
 
-        print(message)
-
-        terminal_name = "/dev/pts/4"
-
         if sys.stdin.isatty():
             terminal_name = os.ttyname(sys.stdin.fileno())
-            print("Active terminal:", terminal_name)
         else:
             print("Not running in an interactive terminal.")
 
-        with open(SUGGESTION_FILE_PATH, "w") as file:
-            file.write(terminal_name+","+message)
+        write_with_lock(SUGGESTION_FILE_PATH, f"{terminal_name},{message}")
     else:
         print("There was an error")
 
