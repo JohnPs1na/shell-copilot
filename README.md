@@ -16,6 +16,10 @@ pip install -r requirements.txt
 export TEMPORAL_CONNECTION="local"
 export GOOGLE_API_KEY="your_google_api_key" # used for gemini api
 ```
-
+- in another terminal train the model using this (the default dataset is already provided in the repo)
+```
+cd classifier
+python train_bert.py
+```
 ### run project
 - run `source run_project.sh`
