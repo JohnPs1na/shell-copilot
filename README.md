@@ -1,10 +1,14 @@
 # shell-copilot
 able to help you navigate via shell
 
-how to run
+how to run (only mac instructions for now)
 
 ### prerequisites
 - create a virtual environment, run the following commands
+- install temporal with brew `brew install temporal`
+- install rabbitmq with brew `brew install rabbitmq`
+- `brew services start rabbitmq`
+  
 ```
 conda create -n shell-copilot
 conda activate shell-copilot
