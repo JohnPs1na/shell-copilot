@@ -4,8 +4,12 @@ import re
 import uuid
 import requests
 import fcntl
+import threading
+import pika
+import json
 
 FILE_PATH = "/tmp/suggestions.txt"
+RABBITMQ_QUEUE = "ASSISTANT_QUEUE"
 
 
 def ensure_file_exists(file_path):
@@ -33,12 +37,12 @@ def tail_f(file_path):
                 time.sleep(0.1)
                 continue
 
-def display_suggestion(terminal_id, suggestion):
+def display_message(terminal_id, message):
 
     tty_path = f"{terminal_id}"
     try:
         with open(tty_path, "w") as tty:
-            tty.write("\033[90m" + suggestion.strip() + "\033[0m")
+            tty.write("\033[90m" + message.strip() + "\033[0m")
             tty.flush()
     except Exception as e:
         print(f"Error writing to terminal {terminal_id}: {e}")
@@ -65,11 +69,11 @@ def process_line(line):
 
         if system_intent == "suggestion":
             suggestion = response["system_output"]["suggestion_prompt"]
-            display_suggestion(terminal_id, suggestion)
+            display_message(terminal_id, suggestion)
         
         elif system_intent == "explanation":
             explanation = response["system_output"]["explanation_prompt"]
-            display_suggestion(terminal_id, explanation)
+            display_message(terminal_id, explanation)
         
         with open(FILE_PATH, "w") as f:
             f.truncate(0)
@@ -79,12 +83,59 @@ def process_line(line):
     except Exception as e:
         print(f"Error processing line: {e}")
 
+def rabbitmq_listener():
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
+        
+        channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
+        print(f" [*] Waiting for messages in {RABBITMQ_QUEUE}. To exit press CTRL+C")
+        
+        def callback(ch, method, properties, body):
+            try:
+                message_data = json.loads(body)
+                terminal_id = message_data.get("terminal_id", "")
+                message = message_data.get("message", "")
+                
+                display_message(terminal_id, message)
+                
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except Exception as e:
+                print(f"Error processing RabbitMQ message: {e}")
+        
+        channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(queue=RABBITMQ_QUEUE, on_message_callback=callback)
+        
+        channel.start_consuming()
+    except Exception as e:
+        print(f"RabbitMQ connection error: {e}")
+        time.sleep(5)
+        rabbitmq_listener()
 
-def main():
 
+def file_monitor_thread():
+    """Thread function to monitor the file and process lines"""
     ensure_file_exists(FILE_PATH)
     for line in tail_f(FILE_PATH):
         process_line(line)
+
+
+def main():
+    # Create and start the file monitor thread
+    file_thread = threading.Thread(target=file_monitor_thread, daemon=True)
+    file_thread.start()
+    
+    # Create and start the RabbitMQ listener thread
+    rabbitmq_thread = threading.Thread(target=rabbitmq_listener, daemon=True)
+    rabbitmq_thread.start()
+    
+    # Keep the main thread alive
+    try:
+        while True:
+            time.sleep(0.5)
+
+    except KeyboardInterrupt:
+        print("Shutting down...")
 
 if __name__ == "__main__":
     main()
