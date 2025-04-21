@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import os
 import sys
-import httpx
-import asyncio
+import requests
 import fcntl
 
 SUGGESTION_FILE_PATH = "/tmp/suggestions.txt"
+ACTIVE_WORKFLOW_FILE = "/tmp/active_workflow.txt"
 
 def ensure_file_exists(file_path):
     """
@@ -31,7 +31,7 @@ def write_with_lock(file_path, content):
 
 def main():
     ensure_file_exists(SUGGESTION_FILE_PATH)
-
+    ensure_file_exists(ACTIVE_WORKFLOW_FILE)
     if not os.path.exists(SUGGESTION_FILE_PATH):
         print("Error: bugs server is not running.")
         return
@@ -42,13 +42,35 @@ def main():
 
     if len(sys.argv) > 1:
         message = " ".join(sys.argv[1:])
+        active_workflow = ""
 
-        if sys.stdin.isatty():
-            terminal_name = os.ttyname(sys.stdin.fileno())
+        with open(ACTIVE_WORKFLOW_FILE, "r") as f:
+            content = f.readline()
+            if content != "":
+                active_workflow, terminal_name = content.split(",")
+        
+        if active_workflow == "":
+
+            if sys.stdin.isatty():
+                terminal_name = os.ttyname(sys.stdin.fileno())
+            else:
+                print("Not running in an interactive terminal.")
+
+            write_with_lock(SUGGESTION_FILE_PATH, f"{terminal_name},{message}")
+        
         else:
-            print("Not running in an interactive terminal.")
+            try:
+                data = {
+                    "user_input": message
+                }
 
-        write_with_lock(SUGGESTION_FILE_PATH, f"{terminal_name},{message}")
+                requests.post(f"http://localhost:8080/send_signal/{active_workflow}", json=data)
+
+            except Exception as e:
+                print("Error: Unable to send signal to workflow.")
+                return
+
+
     else:
         print("There was an error")
 

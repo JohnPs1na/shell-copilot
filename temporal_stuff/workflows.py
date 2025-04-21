@@ -186,9 +186,8 @@ class AssistantWorkflow:
             while not self.pending_message_queue.empty():
                 message = self.pending_message_queue.get_nowait()
                 print(f"User input for clarification: {message}")
-
-                self.workflow_state.current_message.message = message
-                self.workflow_state.disambiguate = False
+                self.workflow_state.current_message.message += f" {message}"
+                await self.finalize_workflow(response)
                 break
 
         print("CLOSING...")

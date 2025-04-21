@@ -9,6 +9,7 @@ import pika
 import json
 
 FILE_PATH = "/tmp/suggestions.txt"
+ACTIVE_WORKFLOW_FILE = "/tmp/active_workflow.txt"
 RABBITMQ_QUEUE = "ASSISTANT_QUEUE"
 
 
@@ -49,6 +50,7 @@ def display_message(terminal_id, message):
 
 def process_line(line):
     try:
+
         terminal_id, user_message = line.strip().split(",")
         
         random_uuid = uuid.uuid4()
@@ -62,9 +64,11 @@ def process_line(line):
             }
         }
 
+        with open(ACTIVE_WORKFLOW_FILE, "w") as f:
+            f.write(f"{random_uuid},{terminal_id}")
+
         response = requests.post("http://localhost:8080/start_workflow", json=data).json()
         
-
         system_intent = response["intent_detection"]["intent"]
 
         if system_intent == "suggestion":
@@ -75,6 +79,12 @@ def process_line(line):
             explanation = response["system_output"]["explanation_prompt"]
             display_message(terminal_id, explanation)
         
+
+        with open(ACTIVE_WORKFLOW_FILE, "w") as f:
+            f.truncate(0)
+            f.flush()
+            os.fsync(f.fileno())
+
         with open(FILE_PATH, "w") as f:
             f.truncate(0)
             f.flush()
@@ -121,6 +131,8 @@ def file_monitor_thread():
 
 
 def main():
+    ensure_file_exists(ACTIVE_WORKFLOW_FILE)
+
     # Create and start the file monitor thread
     file_thread = threading.Thread(target=file_monitor_thread, daemon=True)
     file_thread.start()
