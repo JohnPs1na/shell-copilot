@@ -36,16 +36,12 @@ def main():
         print("Error: bugs server is not running.")
         return
 
-    if len(sys.argv) < 2:
-        print("Usage: bugs <command> <message>")
+    if len(sys.argv) < 1:
+        print("Usage: bugs <message>")
         return
 
-
-    command = sys.argv[1]
-    keywords = ["suggest", "say"]
-
-    if command in keywords and len(sys.argv) > 2:
-        message = " ".join(sys.argv[2:])
+    if len(sys.argv) > 1:
+        message = " ".join(sys.argv[1:])
 
         if sys.stdin.isatty():
             terminal_name = os.ttyname(sys.stdin.fileno())

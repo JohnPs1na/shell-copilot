@@ -174,7 +174,7 @@ class AssistantWorkflow:
         elif response["intent"] == "explanation":
             explanation = await workflow.execute_activity_method(
                 Activities.get_explanation,
-                response,
+                args=[response,self.workflow_state.current_message.message],
                 start_to_close_timeout=timedelta(seconds=10),
                 retry_policy=retry_policy
             )

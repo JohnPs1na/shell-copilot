@@ -29,7 +29,7 @@ class Activities:
         self.intent_classifier.eval()
         
         self.label2idx = {"Explain": 0, "Suggest": 1, "Out Of Scope": 2}
-        self.idx2label = {0: "Explain", 1: "Suggest", 2: "Out Of Scope"}
+        self.idx2label = {0: "explanation", 1: "suggestion", 2: "Out Of Scope"}
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.intent_classifier.to(self.device)
 
@@ -40,7 +40,19 @@ class Activities:
 
     @activity.defn
     async def detect_intent(self,msgOBJ):
-
+        message = msgOBJ["message"].lower()
+        
+        suggestion_keywords = ['how to', 'how do i', 'what command', 'what is the command', 'can you help me', 'show me', "suggest"]
+        explanation_keywords = ['what does', 'explain', 'what is', 'what are', 'why', 'meaning of', 'what means', "explain"]
+        
+        if any(keyword in message for keyword in suggestion_keywords):
+            self.predicted_label = "suggestion"
+            return {"intent": self.predicted_label}
+            
+        if any(keyword in message for keyword in explanation_keywords):
+            self.predicted_label = "explanation"
+            return {"intent": self.predicted_label}
+            
         encoding = self.tokenizer.encode_plus(
             msgOBJ["message"],
             add_special_tokens=True,
@@ -60,8 +72,9 @@ class Activities:
             predicted_label = torch.argmax(outputs.logits, dim=1).item()
             print("Predicted label:", self.idx2label[predicted_label])
 
+        self.predicted_label = self.idx2label[predicted_label]
         response_obj = {
-            "intent":self.idx2label[predicted_label]
+            "intent":self.predicted_label
         }
 
         return response_obj
@@ -71,10 +84,12 @@ class Activities:
     async def analyze_info(self,message_context):
         mock_response_obj = {
             "disambiguate": False,
-            "intent":"suggestion",
+            "intent":self.predicted_label,
             "message": message_context,
             "suggestion_type": "shell",
-            "suggestion_prompt": "USE: ls -al"
+            "suggestion_prompt": "USE: ls -al",
+            "explanation_type": "tech",
+            "explanation_prompt": "",
         }
         return mock_response_obj
 
@@ -103,7 +118,7 @@ class Activities:
             ).replace("response:","").strip()
 
             return ExplanationInfo(
-                explanation_type=response["suggestion_type"],
+                explanation_type=response["explanation_type"],
                 explanation_prompt=f"{explanation}",
             )
         except Exception as e:

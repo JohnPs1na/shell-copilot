@@ -58,10 +58,18 @@ def process_line(line):
             }
         }
 
-        response = requests.post("http://localhost:8080/start_workflow", json=data)
-        suggestion = response.json()["system_output"]["suggestion_prompt"]
+        response = requests.post("http://localhost:8080/start_workflow", json=data).json()
         
-        display_suggestion(terminal_id, suggestion)
+
+        system_intent = response["intent_detection"]["intent"]
+
+        if system_intent == "suggestion":
+            suggestion = response["system_output"]["suggestion_prompt"]
+            display_suggestion(terminal_id, suggestion)
+        
+        elif system_intent == "explanation":
+            explanation = response["system_output"]["explanation_prompt"]
+            display_suggestion(terminal_id, explanation)
         
         with open(FILE_PATH, "w") as f:
             f.truncate(0)
