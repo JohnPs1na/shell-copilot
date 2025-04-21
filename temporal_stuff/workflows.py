@@ -24,6 +24,7 @@ class AssistantWorkflow:
             current_message=None,
             chat_history=[],
             workflow_id="",
+            terminal_id="",
             context={}
         )
 
@@ -31,62 +32,6 @@ class AssistantWorkflow:
             maximum_attempts=3,
             maximum_interval=timedelta(seconds=2)
         )
-
-    async def finalize_workflow(self, response):
-        if response['intent'] == "suggestion":
-            suggestion = await workflow.execute_activity_method(
-                Activities.get_suggestion,
-                args=[response, self.workflow_state.current_message.message],
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=self.retry_policy
-            )
-
-            suggestion_prompt = suggestion.suggestion_prompt
-            suggestion_type = suggestion.suggestion_type
-
-            if "[ambiguity detected]" in suggestion_prompt:
-                self.workflow_state.disambiguate = True
-            else:
-                self.workflow_state.disambiguate = False
-
-            self.workflow_state.system_output = suggestion
-            print(f"suggestion: {suggestion}")
-
-            message_struct = Message(
-                message=self.workflow_state.current_message.message,
-                response=response["message"]
-            )
-
-            self.workflow_state.chat_history.append(message_struct)
-
-        elif response["intent"] == "explanation":
-            explanation = await workflow.execute_activity_method(
-                Activities.get_explanation,
-                args=[response, self.workflow_state.current_message.message],
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=self.retry_policy
-            )
-
-            self.workflow_state.system_output = explanation
-            print(f"explanation: {explanation}")
-
-            message_struct = Message(
-                message=self.workflow_state.current_message.message,
-                response=response["message"]
-            )
-
-            self.workflow_state.chat_history.append(message_struct)
-
-        else:
-            response = "I dont understand what are you saying"
-            message = Message(
-                message=self.workflow_state.current_message.message,
-                response=response
-            )
-
-            self.workflow_state.chat_history.append(message)
-
-        print(f"Workflow state: {self.workflow_state}")
 
 
     @workflow.query(name="get_status")
@@ -107,6 +52,7 @@ class AssistantWorkflow:
         self.workflow_state.current_message = Message(message=request.message, response="")
         self.workflow_state.workflow_id = request.workflow_id
         self.workflow_state.context = request.context
+        self.workflow_state.terminal_id = request.context.get("terminal_id", "")
 
         user_input: str = ""  # used to receive signals on different stages of the workflow state
 
@@ -156,7 +102,8 @@ class AssistantWorkflow:
             queue_params = RabbitMqQueueParams(
                 queue_name="ASSISTANT_QUEUE",
                 exchange="",
-                message=response["message"]
+                message=response["message"],
+                terminal_id=self.workflow_state.terminal_id
             )
 
             await workflow.execute_activity_method(
@@ -220,7 +167,8 @@ class AssistantWorkflow:
             queue_params = RabbitMqQueueParams(
                 queue_name="ASSISTANT_QUEUE",
                 exchange="",
-                message=response["message"]
+                message=self.workflow_state.current_message.response,
+                terminal_id=self.workflow_state.terminal_id
             )
 
             await workflow.execute_activity_method(
@@ -243,6 +191,62 @@ class AssistantWorkflow:
                 self.workflow_state.disambiguate = False
                 break
 
-
         print("CLOSING...")
         return self.workflow_state
+
+    async def finalize_workflow(self, response):
+        if response['intent'] == "suggestion":
+            suggestion = await workflow.execute_activity_method(
+                Activities.get_suggestion,
+                args=[response, self.workflow_state.current_message.message],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=self.retry_policy
+            )
+
+            suggestion_prompt = suggestion.suggestion_prompt
+            suggestion_type = suggestion.suggestion_type
+
+            if "[ambiguity detected]" in suggestion_prompt:
+                self.workflow_state.disambiguate = True
+                self.workflow_state.current_message.response = suggestion_prompt
+            else:
+                self.workflow_state.disambiguate = False
+
+            self.workflow_state.system_output = suggestion
+            print(f"suggestion: {suggestion}")
+
+            message_struct = Message(
+                message=self.workflow_state.current_message.message,
+                response=response["message"]
+            )
+
+            self.workflow_state.chat_history.append(message_struct)
+
+        elif response["intent"] == "explanation":
+            explanation = await workflow.execute_activity_method(
+                Activities.get_explanation,
+                args=[response, self.workflow_state.current_message.message],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=self.retry_policy
+            )
+
+            self.workflow_state.system_output = explanation
+            print(f"explanation: {explanation}")
+
+            message_struct = Message(
+                message=self.workflow_state.current_message.message,
+                response=response["message"]
+            )
+
+            self.workflow_state.chat_history.append(message_struct)
+
+        else:
+            response = "I dont understand what are you saying"
+            message = Message(
+                message=self.workflow_state.current_message.message,
+                response=response
+            )
+
+            self.workflow_state.chat_history.append(message)
+
+        print(f"Workflow state: {self.workflow_state}")

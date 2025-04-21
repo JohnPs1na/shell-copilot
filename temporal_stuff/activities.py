@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification
 from temporal_stuff.Chatbot import Chatbot
+import json
 
 @dataclass 
 class NonRetriableError(Exception):
@@ -103,7 +104,7 @@ class Activities:
 
             return SuggestionInfo(
                 suggestion_type=response["suggestion_type"],
-                suggestion_prompt=f"Use: {suggestion}",
+                suggestion_prompt=f"{suggestion}",
             )
         except Exception as e:
             activity.logger.exception("Suggestion Info fail")
@@ -132,10 +133,16 @@ class Activities:
             connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
             channel = connection.channel()
             channel.queue_declare(queue_params.queue_name, True)
+            
+            message_body = json.dumps({
+                "terminal_id": queue_params.terminal_id,
+                "message": queue_params.message
+            })
+            
             channel.basic_publish(
                 exchange=queue_params.exchange,
                 routing_key=queue_params.queue_name,
-                body=queue_params.message
+                body=message_body
             )
         except Exception as e:
             activity.logger.exception("Publish Message Failed")

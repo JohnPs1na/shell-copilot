@@ -12,7 +12,7 @@ class Message:
 class MessageRequest:
     workflow_id: str
     message: str
-    context: Optional[dict] = None 
+    context: Optional[dict] = None
 
 @dataclass
 class MessageContext:
@@ -30,7 +30,7 @@ class WorkflowState:
     chat_history: List
     workflow_id: str
     context: dict
-
+    terminal_id: str
 @dataclass
 class SuggestionInfo:
     suggestion_type: str
@@ -46,4 +46,5 @@ class RabbitMqQueueParams:
     queue_name: str 
     exchange: str
     message: str
+    terminal_id: str
 
