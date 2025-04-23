@@ -64,7 +64,7 @@ def main():
                     "user_input": message
                 }
 
-                requests.post(f"http://localhost:8080/send_signal/{active_workflow}", json=data)
+                requests.post(f"http://localhost:12345/send_signal/{active_workflow}", json=data)
 
             except Exception as e:
                 print("Error: Unable to send signal to workflow.")

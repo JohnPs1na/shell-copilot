@@ -30,12 +30,12 @@ else
     echo "Python worker is already running"
 fi
 
-# Check if server.py is running on port 8080
-if ! lsof -i :8080 > /dev/null 2>&1; then
+# Check if server.py is running on port 12345
+if ! lsof -i :12345 > /dev/null 2>&1; then
     echo "Starting server.py..."
     python server.py &
     sleep 1
 else
-    echo "server.py is already running on port 8080"
+    echo "server.py is already running on port 12345"
 fi
 

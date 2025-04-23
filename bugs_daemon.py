@@ -67,7 +67,7 @@ def process_line(line):
         with open(ACTIVE_WORKFLOW_FILE, "w") as f:
             f.write(f"{random_uuid},{terminal_id}")
 
-        response = requests.post("http://localhost:8080/start_workflow", json=data).json()
+        response = requests.post("http://localhost:12345/start_workflow", json=data).json()
         
         system_intent = response["intent_detection"]["intent"]
 

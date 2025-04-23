@@ -51,4 +51,4 @@ async def send_signal(workflow_id:str, body: dict=Body(...)):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app="server:app",host='0.0.0.0', port=8080, reload=True)
+    uvicorn.run(app="server:app",host='0.0.0.0', port=12345, reload=True)
