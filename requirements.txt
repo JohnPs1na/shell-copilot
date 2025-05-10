@@ -1,4 +1,6 @@
 fastapi
+SQLAlchemy==2.0.28
+sqlalchemy-utils==0.41.1
 uvicorn
 prompt_toolkit
 temporalio==1.6.0
@@ -12,3 +14,5 @@ torch
 pandas
 scikit-learn
 numpy
+pydantic-settings
+pymysql
