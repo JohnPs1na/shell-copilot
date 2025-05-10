@@ -54,7 +54,7 @@ class AssistantWorkflow:
         self.workflow_state.context = request.context
         self.workflow_state.terminal_id = request.context.get("terminal_id", "")
 
-        user_input: str = ""  # used to receive signals on different stages of the workflow state
+        user_input: str = ""
 
         # ACTIVITY INTENT
         message_info = await workflow.execute_activity_method(

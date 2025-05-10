@@ -56,7 +56,7 @@ def main():
             else:
                 print("Not running in an interactive terminal.")
 
-            write_with_lock(SUGGESTION_FILE_PATH, f"{terminal_name},{message}")
+            write_with_lock(SUGGESTION_FILE_PATH, f"{terminal_name}::::{message}")
         
         else:
             try:

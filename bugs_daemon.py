@@ -51,7 +51,7 @@ def display_message(terminal_id, message):
 def process_line(line):
     try:
 
-        terminal_id, user_message = line.strip().split(",")
+        terminal_id, user_message = line.strip().split("::::")
         
         random_uuid = uuid.uuid4()
         
