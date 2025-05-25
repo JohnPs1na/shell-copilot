@@ -78,6 +78,9 @@ def process_line(line):
         elif system_intent == "explanation":
             explanation = response["system_output"]["explanation_prompt"]
             display_message(terminal_id, explanation)
+
+        elif system_intent == "new session":
+            display_message(terminal_id, "Starting new session")
         
 
         with open(ACTIVE_WORKFLOW_FILE, "w") as f:

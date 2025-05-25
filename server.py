@@ -1,16 +1,22 @@
 import json
 from http import HTTPStatus
 from http.client import HTTPResponse
+import uuid
 
 import uvicorn
-from fastapi import FastAPI, Body, Response
+from fastapi import FastAPI, Body, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from models.schemas import *
-from temporal_stuff.shared import MessageRequest, ASSISTANT_QUEUE
+from temporal_stuff.shared import Message, MessageRequest, ASSISTANT_QUEUE
 from temporal_stuff.temporal_client import get_temporal_client
 from temporal_stuff.workflows import AssistantWorkflow
+from database.database import engine, SessionLocal
+from sqlalchemy.orm import Session as SqlAlchemySession
+from typing import Annotated
+from database.models import *
+
 app = FastAPI(debug=True)
 
 app.add_middleware(
@@ -19,6 +25,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_origins=["*"],
 )
+
+
+def get_db_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+db_dependency = Annotated[SqlAlchemySession, Depends(get_db_session)]
+
+
+class ChatResponse(BaseModel):
+    user_message: Message
+    intent_detection: dict
+    system_output: dict
 
 @app.get("/health")
 async def health():
@@ -31,7 +54,42 @@ async def sayhello(request:HelloRequest) -> Response:
 
 
 @app.post("/start_workflow")
-async def start_workflow(body: MessageRequest):
+async def start_workflow(body: MessageRequest, db: db_dependency) -> ChatResponse:
+    active_session = db.query(Session).filter(Session.is_active).first() 
+
+    if "new session" in body.message.lower():
+        if active_session:
+            active_session.is_active = False
+            db.commit()
+
+        session_id = str(uuid.uuid4())
+        session = Session(session_id=session_id)
+        db.add(session)
+        db.commit()
+        active_session = session
+
+        chat = Chat(
+            session_id=session_id,
+            user_message=body.message,
+            assistant_response="Starting new session",
+            intent="new session",
+        )
+        db.add(chat)
+        db.commit()
+
+        return ChatResponse(
+            user_message=Message(message=body.message,response="Starting new session"),
+            intent_detection={"intent": "new session"},
+            system_output={},
+        )
+
+    elif not active_session:
+        session_id = str(uuid.uuid4())
+        session = Session(session_id=session_id)
+        db.add(session)
+        db.commit()
+        active_session = session
+
     client = await get_temporal_client()
     result = await client.execute_workflow(
         AssistantWorkflow.run,
@@ -39,7 +97,24 @@ async def start_workflow(body: MessageRequest):
         id=body.workflow_id,
         task_queue=ASSISTANT_QUEUE
     )
-    return result 
+
+    system_intent = result.intent_detection["intent"]
+    response = ChatResponse(
+        user_message=Message(message=result.current_message.message,response=""),
+        intent_detection={"intent":system_intent},
+        system_output=result.system_output
+    )
+
+    chat = Chat(
+        session_id=active_session.session_id,
+        user_message=result.current_message.message,
+        assistant_response=result.system_output["suggestion_prompt"] if system_intent == "suggestion" else result.system_output["explanation_prompt"],
+        intent=result.intent_detection["intent"],
+    )
+    db.add(chat)
+    db.commit()
+
+    return response 
 
 
 @app.post("/send_signal/{workflow_id}")

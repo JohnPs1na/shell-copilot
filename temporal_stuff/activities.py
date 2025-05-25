@@ -14,7 +14,6 @@ from temporal_stuff.shared import RabbitMqQueueParams, SuggestionInfo, Explanati
 
 @dataclass
 class NonRetriableError(Exception):
-    """Exception class for errors that should not be retried."""
     
     message: str
     
@@ -24,15 +23,6 @@ class NonRetriableError(Exception):
 
 
 class Activities:
-    """Class containing all Temporal activity implementations for shell copilot.
-    
-    This class implements activities for:
-    - Intent detection
-    - Information analysis
-    - Suggestion generation
-    - Explanation generation
-    - Message publishing
-    """
     
     def __init__(self, intent_classifier_path: str = "../classifier/text_classifier.pt") -> None:
         """Initialize activities with required components.
@@ -43,7 +33,6 @@ class Activities:
         self.client_llm = Chatbot()
         self.predicted_label = ""
         
-        # Initialize intent classification components
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.intent_classifier = BertForSequenceClassification.from_pretrained(
             'bert-base-uncased',
@@ -73,20 +62,8 @@ class Activities:
     
     @activity.defn
     async def detect_intent(self, msg_obj: Dict[str, Any]) -> Dict[str, str]:
-        """Detect the intent of a user message.
+        """Detect the intent of a user message."""
         
-        Detects whether the message is asking for a suggestion, 
-        an explanation, or is out of scope.
-        
-        Args:
-            msg_obj: Dictionary containing the user message
-            
-        Returns:
-            Dictionary with the detected intent
-            
-        Raises:
-            NonRetriableError: If intent detection fails
-        """
         message = msg_obj["message"].lower()
         
         # Simple keyword-based intent detection
@@ -134,19 +111,11 @@ class Activities:
     async def analyze_info(self, message_context: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze message context to determine next actions.
         
-        Determines whether disambiguation is needed and what type of 
-        response to generate.
-        
         Args:
             message_context: Context of the user message
             
         Returns:
-            Dictionary with analysis results including:
-            - disambiguate: Whether disambiguation is needed
-            - intent: Detected intent
-            - message: Context information
-            - suggestion_type/explanation_type: Type of response to generate
-            - suggestion_prompt/explanation_prompt: Prompt for response generation
+            Dictionary with analysis results
         """
         # TODO: Implement actual analysis logic
         mock_response_obj = {
@@ -163,8 +132,6 @@ class Activities:
     @activity.defn
     async def get_suggestion(self, response: Dict[str, Any], user_message: str) -> SuggestionInfo:
         """Generate a suggestion based on user message.
-        
-        Uses the LLM to generate a command suggestion based on the user's request.
         
         Args:
             response: Response object from analyze_info
@@ -193,8 +160,6 @@ class Activities:
     async def get_explanation(self, response: Dict[str, Any], user_message: str) -> ExplanationInfo:
         """Generate an explanation based on user message.
         
-        Uses the LLM to generate an explanation for a shell command or concept.
-        
         Args:
             response: Response object from analyze_info
             user_message: Original user message
@@ -221,8 +186,6 @@ class Activities:
     @activity.defn
     async def publish_message(self, queue_params: RabbitMqQueueParams) -> None:
         """Publish a message to RabbitMQ.
-        
-        Sends a message to the specified RabbitMQ queue.
         
         Args:
             queue_params: Parameters for the RabbitMQ queue
