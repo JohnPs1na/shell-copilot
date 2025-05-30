@@ -171,6 +171,20 @@ class AssistantWorkflow:
                 terminal_id=self.workflow_state.terminal_id
             )
 
+            # Move database operation to an activity
+            chat_data = {
+                "user_message": self.workflow_state.current_message.message,
+                "assistant_response": self.workflow_state.current_message.response,
+                "intent": "Triggers Ambiguous"
+            }
+            
+            await workflow.execute_activity_method(
+                Activities.save_chat,
+                chat_data,
+                start_to_close_timeout=timedelta(seconds=5),
+                retry_policy=self.retry_policy
+            )
+
             await workflow.execute_activity_method(
                 Activities.publish_message,
                 queue_params,

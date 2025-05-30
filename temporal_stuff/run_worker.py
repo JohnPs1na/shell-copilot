@@ -20,7 +20,8 @@ async def main() -> None:
             activities.analyze_info,
             activities.get_suggestion,
             activities.get_explanation,
-            activities.publish_message
+            activities.publish_message,
+            activities.save_chat
         ]
     )
 

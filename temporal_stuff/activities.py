@@ -8,6 +8,8 @@ import torch
 from temporalio import activity
 from transformers import BertTokenizer, BertForSequenceClassification
 
+from database.database import SessionLocal
+from database.models import Chat, Session
 from temporal_stuff.Chatbot import Chatbot
 from temporal_stuff.shared import RabbitMqQueueParams, SuggestionInfo, ExplanationInfo
 
@@ -215,3 +217,19 @@ class Activities:
         finally:
             if connection and connection.is_open:
                 connection.close()
+
+    @activity.defn
+    async def save_chat(self, chat_data: Dict[str, Any]) -> None:
+        db = SessionLocal()
+        try:
+            active_session = db.query(Session).filter(Session.is_active).first() 
+            chat = Chat(
+                session_id=active_session.session_id,
+                user_message=chat_data["user_message"],
+                assistant_response=chat_data["assistant_response"],
+                intent=chat_data["intent"],
+            )
+            db.add(chat)
+            db.commit()
+        finally:
+            db.close()
